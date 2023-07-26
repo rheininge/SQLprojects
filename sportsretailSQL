@@ -1,0 +1,251 @@
+# Create Database & Tables
+
+DROP TABLE info;
+
+CREATE TABLE info
+(
+    product_name VARCHAR(100),
+    product_id VARCHAR(11) PRIMARY KEY,
+    description VARCHAR(700)
+);
+
+DROP TABLE finance;
+
+CREATE TABLE finance
+(
+    product_id VARCHAR(11) PRIMARY KEY,
+    listing_price FLOAT,
+    sale_price FLOAT,
+    discount FLOAT,
+    revenue FLOAT
+);
+
+DROP TABLE reviews;
+
+CREATE TABLE reviews
+(
+    product_id VARCHAR(11) PRIMARY KEY,
+    rating FLOAT,
+    reviews FLOAT
+);
+
+DROP TABLE traffic;
+
+CREATE TABLE traffic
+(
+    product_id VARCHAR(11) PRIMARY KEY,
+    last_visited TIMESTAMP
+);
+
+DROP TABLE brands;
+
+CREATE TABLE brands
+(
+    product_id VARCHAR(11) PRIMARY KEY,
+    brand VARCHAR(7)
+);
+
+\copy info FROM 'info_v2.csv' DELIMITER ',' CSV HEADER;
+\copy finance FROM 'finance.csv' DELIMITER ',' CSV HEADER;
+\copy reviews FROM 'reviews_v2.csv' DELIMITER ',' CSV HEADER;
+\copy traffic FROM 'traffic_v3.csv' DELIMITER ',' CSV HEADER;
+\copy brands FROM 'brands_v2.csv' DELIMITER ',' CSV HEADER;
+
+# Data Exploration/Check for missing values
+
+SELECT COUNT(*) AS total_rows, 
+    COUNT(i.description) AS count_description, 
+    COUNT(f.listing_price) AS count_listing_price, 
+    COUNT(t.last_visited) AS count_last_visited 
+FROM info AS i
+INNER JOIN finance AS f
+    ON i.product_id = f.product_id
+INNER JOIN traffic AS t
+    ON t.product_id = f.product_id;
+
+# How do Nike and Adidas prices differ?
+
+SELECT b.brand, f.listing_price::integer, COUNT(f.*)
+FROM finance AS f
+INNER JOIN brands AS b
+ON f.product_id = b.product_id
+WHERE listing_price > 0
+GROUP BY b.brand, f.listing_price
+ORDER BY listing_price DESC;
+
+# Group by price range & brand
+
+SELECT b.brand, COUNT(f.*), SUM(f.revenue) AS total_revenue,
+CASE WHEN f.listing_price < 42 THEN 'Budget'
+    WHEN f.listing_price >= 42 AND f.listing_price < 74 THEN 'Average'
+    WHEN f.listing_price >= 74 AND f.listing_price < 129 THEN 'Expensive'
+    ELSE 'Elite' END AS price_category
+FROM finance AS f
+INNER JOIN brands AS b
+ON f.product_id = b.product_id
+WHERE b.brand IS NOT NULL
+GROUP BY b.brand, price_category
+ORDER BY total_revenue DESC;
+
+#output:
+
+brand	count	total_revenue	price_category
+Adidas	849	4626980.06	Expensive
+Adidas	1060	3233661.06 Average
+Adidas	307	3014316.82	Elite
+Adidas	359	651661.12	Budget
+Nike	357	595341.019	Budget
+Nike	82	128475.59	Elite
+Nike	90	71843.15	Expensive
+Nike	16	6623.5	Average
+
+#Adidas generates more revenue regardless of price category, with higher item counts in each category. Company could potentially stock higher amounts of "elite" adidas products to increase revenue.
+
+#Revenue does not include discounts as which the items are sold. Explore discounts for each brand
+
+SELECT b.brand, AVG(f.discount) * 100 AS average_discount
+FROM brands AS b
+INNER JOIN finance AS f 
+    ON b.product_id = f.product_id
+GROUP BY b.brand
+HAVING b.brand IS NOT NULL
+ORDER BY average_discount;
+
+#output:
+
+brand	average_discount
+Nike	0.0
+Adidas	33.452427184465606
+
+#Adidas products are heavily discounted while Nike products are not. Revenue could be increased by lowering the adidas discounts or offering some discounts on Nike products
+
+#Analyze relationships between columns
+
+SELECT corr(r.reviews, f.revenue) AS review_revenue_corr
+FROM reviews AS r
+INNER JOIN finance AS f
+USING (product_id);
+
+#output:
+
+review_revenue_corr
+0.6518512283481301
+
+#There is a moderate positive correlation between the numbers of reviews and revenue, meaning the more reviews a product has, the more revenue per product. The company could encourage
+a small discount if the customer leaves a review on their purchase
+
+#Analyze relationship between item description length, rating, reviews, & revenue
+
+SELECT TRUNC(LENGTH(i.description), -2) AS description_length,
+    ROUND(AVG(r.rating::numeric), 2) AS average_rating
+FROM info AS i
+INNER JOIN reviews AS r 
+USING(product_id)
+WHERE i.description IS NOT NULL
+GROUP BY description_length
+ORDER BY description_length;
+
+#output
+
+description_length	average_rating
+0	1.87
+100	3.21
+200	3.27
+300	3.29
+400	3.32
+500	3.12
+600	3.65
+
+# No clear pattern between description length and average rating
+
+# Review number of reviews by month and brand
+
+SELECT b.brand, DATE_PART('month', t.last_visited) AS month, COUNT(r.*) AS num_reviews
+FROM brands AS b
+INNER JOIN traffic AS t 
+USING(product_id)
+INNER JOIN reviews AS r 
+USING(product_id)
+GROUP BY b.brand, month
+HAVING b.brand IS NOT NULL
+AND DATE_PART('month', t.last_visited) IS NOT NULL
+ORDER BY b.brand, month;
+
+#output
+
+brand	month	num_reviews
+Adidas	1.0	253
+Adidas	2.0	272
+Adidas	3.0	269
+Adidas	4.0	180
+Adidas	5.0	172
+Adidas	6.0	159
+Adidas	7.0	170
+Adidas	8.0	189
+Adidas	9.0	181
+Adidas	10.0	192
+Adidas	11.0	150
+Adidas	12.0	190
+Nike	1.0	52
+Nike	2.0	52
+Nike	3.0	55
+Nike	4.0	42
+Nike	5.0	41
+Nike	6.0	43
+Nike	7.0	37
+Nike	8.0	29
+Nike	9.0	28
+Nike	10.0	47
+Nike	11.0	38
+Nike	12.0	35
+
+# First quarter reviews are much higher than the other 3. there is potential to target review incentives during the last 9 months of the year
+
+# examine types of products being sold in the store, not just brand
+
+WITH footwear AS
+(
+    SELECT i.description, f.revenue
+    FROM info AS i
+    INNER JOIN finance AS f
+    USING(product_id)
+    WHERE i.description ILIKE '%shoe%' OR i.description ILIKE '%trainer%' OR i.description ILIKE '%foot%'
+    AND i.description IS NOT NULL  
+)
+
+SELECT COUNT(*) AS num_footwear_products, 
+percentile_disc(0.5) WITHIN GROUP (ORDER BY revenue) AS median_footwear_revenue
+FROM footwear;
+
+#output:
+
+num_footwear_products	median_footwear_revenue
+2700	3118.36
+
+#Footwear is about 85% of the product mix, and generates a median revenue of about $3118
+
+# Use the same CTE, footwear, to find median revenue from clothing
+
+WITH footwear AS
+(
+    SELECT i.description, f.revenue
+    FROM info AS i
+    INNER JOIN finance AS f
+    USING(product_id)
+    WHERE i.description ILIKE '%shoe%' OR i.description ILIKE '%trainer%' OR i.description ILIKE '%foot%'
+    AND i.description IS NOT NULL 
+    
+)
+
+SELECT COUNT(i.*) AS num_clothing_products,
+percentile_disc(0.5) WITHIN GROUP (ORDER BY f.revenue) AS median_clothing_revenue
+FROM info AS i
+INNER JOIN finance AS f
+USING(product_id)
+WHERE i.description NOT IN (SELECT description FROM footwear);
+
+#output:
+
+num_clothing_products	median_clothing_revenue
+417	503.82
+
