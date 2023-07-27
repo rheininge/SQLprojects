@@ -1,0 +1,49 @@
+# Find the three top industries and the number of unicorn companies in those industries, for years 2019, 2020, and 2021. 
+
+WITH top_industries AS
+(
+    SELECT i.industry, COUNT(i.*)
+    FROM industries AS i
+    INNER JOIN dates AS d
+    ON i.company_id = d.company_id
+    WHERE EXTRACT(year FROM d.date_joined) in ('2019', '2020', '2021')
+    GROUP BY industry
+    ORDER BY count DESC
+    LIMIT 3
+),
+
+yearly_rankings AS 
+(
+    SELECT COUNT(i.*) AS num_unicorns, i.industry, EXTRACT(year FROM d.date_joined) AS year,
+    AVG(f.valuation) AS average_valuation
+    FROM industries AS i
+    INNER JOIN dates AS d
+    ON i.company_id = d.company_id
+    INNER JOIN funding AS f
+    ON d.company_id = f.company_id
+    GROUP BY industry, year
+)
+
+SELECT industry, year, num_unicorns, ROUND(AVG(average_valuation / 1000000000), 2) AS average_valuation_billions
+FROM yearly_rankings
+WHERE year in ('2019', '2020', '2021')
+AND industry in (SELECT industry
+                FROM top_industries)
+GROUP BY industry, num_unicorns, year
+ORDER BY year DESC, num_unicorns DESC;
+
+#Output:
+
+"industry","year","num_unicorns","average_valuation_billions"
+"Fintech",2021,138,2.75
+"Internet software & services",2021,119,2.15
+"E-commerce & direct-to-consumer",2021,47,2.47
+"Internet software & services",2020,20,4.35
+"E-commerce & direct-to-consumer",2020,16,4
+"Fintech",2020,15,4.33
+"Fintech",2019,20,6.8
+"Internet software & services",2019,13,4.23
+"E-commerce & direct-to-consumer",2019,12,2.58
+
+#Top three industries were identified to be Fintech, Internet and Software Services, and Ecommerce & Direct-to-Consumer. 2021 was a very good year for Fintech companies,
+  jumping from 15 to 138 unicorns. 
