@@ -8,3 +8,6 @@ Analysis of the data helped develop the following recommendations:
 1. Decrease Adidas discounts for potential increased revenue
 2. Increase Nike discounts for potential increased revenue
 3. Offer a small discount in exchance for leaving a product review, to be used on the next customer purchase, during quarters 2-4
+
+## Analyzing High-growth Companies 2019-2021
+This project takes the perspective of an investment firm looking to understand which industries are seeing the most growth and to identify any new companies that could help the firm capitalize on their investments. The database of companies to analyze has 4 tables; dates, funding, industries, and companies.  
