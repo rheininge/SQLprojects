@@ -1,3 +1,4 @@
+# Create a query to break down net revenue by product line and warehouse, grouped by months June, July, and August
 
 SELECT product_line, 
 CASE WHEN EXTRACT('month' FROM date) = 6 THEN 'June'
@@ -9,6 +10,8 @@ FROM sales
 WHERE client_type = 'Wholesale'
 GROUP BY product_line, month, warehouse
 ORDER BY product_line, month, net_revenue DESC;
+
+#outpout
 
 "product_line","month","warehouse","net_revenue"
 "Breaking system","August","Central",3009.1
@@ -59,3 +62,6 @@ ORDER BY product_line, month, net_revenue DESC;
 "Suspension & traction","June","North",7985.17
 "Suspension & traction","June","Central",3291.8
 "Suspension & traction","June","West",2348.83
+
+# Query commands easily can be tweaked to reorder by certain variables and 
+
